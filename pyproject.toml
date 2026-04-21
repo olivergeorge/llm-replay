@@ -1,0 +1,73 @@
+[project]
+name = "llm-replay"
+version = "0.1a0"
+description = "Opt-in record-and-replay for llm responses"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [
+    { name = "Oliver George" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Utilities",
+]
+
+dependencies = [
+    "llm",
+    "sqlite-utils>=3.37",
+    "click",
+]
+
+[project.entry-points.llm]
+llm_replay = "llm_replay"
+
+[project.urls]
+Issues = "https://github.com/olivergeorge/llm-replay/issues"
+
+[tool.uv.sources]
+llm = { path = "../llm", editable = true }
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "llm-echo==0.3a3",
+    "ruff",
+    # "ty",  # Astral type checker — enable once we want static typing on this codebase
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+]
+
+# [tool.ty.environment]
+# python-version = "3.10"
+#
+# [tool.ty.src]
+# include = ["llm_replay", "tests"]
+#
+# [tool.ty.rules]
+# # Tune individual rules here, e.g. index-out-of-bounds = "ignore"
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
