@@ -21,8 +21,17 @@ def user_path(tmp_path):
 
 @pytest.fixture(autouse=True)
 def env_setup(monkeypatch, user_path):
-    """Point llm at the per-test user_path so no test writes to real logs.db."""
+    """Point llm at the per-test user_path so no test writes to real logs.db.
+
+    Also drops ``LLM_REPLAY`` and resets the plugin's ContextVar so a
+    developer's shell-level opt-in (or a prior test's explicit enable /
+    disable) can't bleed into assertions about the default state.
+    """
+    from llm_replay import config
+
     monkeypatch.setenv("LLM_USER_PATH", str(user_path))
+    monkeypatch.delenv("LLM_REPLAY", raising=False)
+    config._ENABLED.set(None)
 
 
 @pytest.fixture

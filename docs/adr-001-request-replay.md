@@ -225,7 +225,7 @@ Not in v1 because the reconstruction of `Request` from disk rows overlaps with `
 2. `--replay-rerun-tools` (Mode C). v1 mocks `tool_results` on replay so tool code never re-fires. A future opt-in flag could bypass the mock and re-fire user callbacks against replayed model decisions — useful when the developer's tool code is what they're iterating on. Open design questions: flag naming, interaction with destructive tools, and whether to re-fire only pure-annotated tools.
 3. Byte-level verification for URL attachments. Recording a content hash at store time and verifying bytes at lookup (flagging drift instead of replaying through it).
 4. Pinning against server-side snapshot rotation when plugins only expose rolling aliases (e.g. `gemini-flash-lite-latest`). Evaluating designs like a "freeze on first observation" mode versus hashing post-execute `resolved_model`.
-5. `LLM_REPLAY=1` env var and config-file toggle.
+5. Config-file toggle / `llm replay default on|off` subcommand (mirroring `llm models default`) for a persistent opt-in that survives across shells. The `LLM_REPLAY=1` env var covers the per-shell case.
 6. Per-request non-determinism opt-out (e.g., `--no-replay-non-deterministic`).
 7. Stabilizing the hookspec as documented third-party API.
 8. Streaming cadence simulation on replays (cosmetic, LiteLLM demonstrates feasibility).

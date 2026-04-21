@@ -85,6 +85,14 @@ def _replay_flag_callback(ctx: click.Context, param: click.Parameter, value: boo
     return value
 
 
+def _no_replay_flag_callback(ctx: click.Context, param: click.Parameter, value: bool) -> bool:
+    """Explicit off-switch so ``LLM_REPLAY=1`` in the environment can be
+    overridden for a single invocation without unsetting the var."""
+    if value:
+        config.disable()
+    return value
+
+
 @hookimpl
 def register_commands(cli: click.Group) -> None:
     """Register ``llm replay`` CLI subcommands and inject ``--replay``."""
@@ -103,25 +111,39 @@ def register_commands(cli: click.Group) -> None:
         SQLiteReplayStore(db).clear()
         click.echo(f"Cleared {count_before} replay entries")
 
-    # Attach --replay to the existing prompt/chat commands. We can't add
-    # it directly in llm core (per docs/upstream-proposal.md Option B: the
-    # plugin owns enablement), so we reach into the group and append a
-    # click.Option with expose_value=False — the callback is the entire
-    # wiring. Idempotent: skip if the flag is already present (e.g. the
-    # cli module was reloaded mid-test).
+    # Attach --replay / --no-replay to the existing prompt/chat commands.
+    # We can't add them directly in llm core (per docs/upstream-proposal.md
+    # Option B: the plugin owns enablement), so we reach into the group and
+    # append click.Options with expose_value=False — the callbacks are the
+    # entire wiring. Idempotent: skip if a flag is already present (e.g.
+    # the cli module was reloaded mid-test).
+    flag_specs = (
+        (
+            "--replay",
+            _replay_flag_callback,
+            "Replay a prior response for identical requests (llm-replay)",
+        ),
+        (
+            "--no-replay",
+            _no_replay_flag_callback,
+            "Override LLM_REPLAY=1 for this invocation (llm-replay)",
+        ),
+    )
     for cmd_name in ("prompt", "chat"):
         cmd = cli.commands.get(cmd_name)
         if cmd is None:
             continue
-        if any("--replay" in (p.opts or ()) for p in cmd.params):
-            continue
-        cmd.params.append(
-            click.Option(
-                ["--replay"],
-                is_flag=True,
-                default=False,
-                expose_value=False,
-                callback=_replay_flag_callback,
-                help="Replay a prior response for identical requests (llm-replay)",
+        existing = {opt for p in cmd.params for opt in (p.opts or ())}
+        for flag, callback, help_text in flag_specs:
+            if flag in existing:
+                continue
+            cmd.params.append(
+                click.Option(
+                    [flag],
+                    is_flag=True,
+                    default=False,
+                    expose_value=False,
+                    callback=callback,
+                    help=help_text,
+                )
             )
-        )

@@ -159,3 +159,62 @@ def test_replay_miss_does_not_emit_signal(register_echo_model):
     finally:
         config.disable()
         _unregister()
+
+
+def test_llm_replay_env_var_enables_replay_without_flag(
+    monkeypatch, logs_db, register_echo_model
+):
+    """``LLM_REPLAY=1`` makes plain ``llm prompt`` replay without --replay."""
+    from llm_replay import config
+
+    monkeypatch.setenv("LLM_REPLAY", "1")
+    _register()
+    try:
+        runner = CliRunner()
+        first = runner.invoke(cli.cli, ["prompt", "-m", "echo", "seed-prompt"])
+        assert first.exit_code == 0, first.stderr
+        assert logs_db["replay_index"].count == 1
+
+        second = runner.invoke(cli.cli, ["prompt", "-m", "echo", "seed-prompt"])
+        assert second.exit_code == 0, second.stderr
+        assert "(replayed from " in second.stderr
+    finally:
+        config._ENABLED.set(None)
+        _unregister()
+
+
+def test_no_replay_flag_overrides_env_var(
+    monkeypatch, logs_db, register_echo_model
+):
+    """``--no-replay`` must beat ``LLM_REPLAY=1`` for a single invocation."""
+    from llm_replay import config
+
+    monkeypatch.setenv("LLM_REPLAY", "1")
+    _register()
+    try:
+        runner = CliRunner()
+        first = runner.invoke(cli.cli, ["prompt", "-m", "echo", "seed-prompt"])
+        assert first.exit_code == 0, first.stderr
+        assert logs_db["replay_index"].count == 1
+
+        # Reset so the second invocation starts from env-default (on) again.
+        config._ENABLED.set(None)
+        second = runner.invoke(
+            cli.cli, ["prompt", "-m", "echo", "--no-replay", "seed-prompt"]
+        )
+        assert second.exit_code == 0, second.stderr
+        assert config.is_enabled() is False
+        assert "(replayed from " not in second.stderr
+    finally:
+        config._ENABLED.set(None)
+        _unregister()
+
+
+def test_no_replay_flag_appears_on_prompt_help():
+    _register()
+    try:
+        result = CliRunner().invoke(cli.cli, ["prompt", "--help"])
+        assert result.exit_code == 0
+        assert "--no-replay" in result.output
+    finally:
+        _unregister()
