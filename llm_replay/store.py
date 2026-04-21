@@ -55,14 +55,29 @@ class ReplayedResponse:
     resolved_model: str | None = None
 
 
-def _emit_replay_signal(source_id: str) -> None:
+def _emit_replay_signal(
+    source_id: str,
+    input_tokens: int | None = None,
+    output_tokens: int | None = None,
+) -> None:
     """Write the ADR-specified replay-hit marker to stderr.
 
     Stderr keeps it off stdout pipes; ``2>/dev/null`` is the documented
     escape hatch. Python-library callers also see this line — they can
     filter via the ``replayed`` attribute or a stderr redirect.
+
+    When the source row recorded token counts, append a "saved N input,
+    M output tokens" tail so users reading the terminal see replay as a
+    positive (tokens avoided) rather than a disclaimer. Models that don't
+    report usage fall back to the bare ``(replayed from <id>)`` form.
     """
-    print(f"(replayed from {source_id})", file=sys.stderr)
+    savings = []
+    if input_tokens is not None:
+        savings.append(f"{input_tokens:,} input")
+    if output_tokens is not None:
+        savings.append(f"{output_tokens:,} output")
+    tail = f" — saved {', '.join(savings)} tokens" if savings else ""
+    print(f"(replayed from {source_id}{tail})", file=sys.stderr)
 
 
 class SQLiteReplayStore:
@@ -89,7 +104,11 @@ class SQLiteReplayStore:
         tool_calls = self._fetch_tool_calls(source["id"])
         tool_results = self._fetch_tool_results(tool_calls) if tool_calls else None
 
-        _emit_replay_signal(source["id"])
+        _emit_replay_signal(
+            source["id"],
+            input_tokens=source.get("input_tokens"),
+            output_tokens=source.get("output_tokens"),
+        )
         return ReplayedResponse(
             chunks=[source["response"] or ""],
             response_json=(
