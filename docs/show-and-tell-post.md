@@ -6,6 +6,33 @@ https://github.com/olivergeorge/llm-replay
 
 **Upfront: this is a proof-of-concept.** It's had minimal testing beyond my own use, depends on two unmerged hookspecs in a fork of `llm` (see below), and is tagged `0.1a0` for a reason. I'm posting it to get feedback on the shape — particularly the hookspec design — rather than because it's ready to depend on.
 
+## What it looks like
+
+A normal call, then the same call again with replay on:
+
+```
+$ llm 'summarise the GIL in one paragraph'
+The Global Interpreter Lock in CPython serialises access to Python objects…
+
+$ llm --replay 'summarise the GIL in one paragraph'
+(replayed from 01k9m2v5hd8mzj9q7fgw4k2pnr — saved 14 input, 186 output tokens)
+The Global Interpreter Lock in CPython serialises access to Python objects…
+```
+
+The replay is a fresh `responses` row; stdout is identical to a live call, with the "saved N tokens" signal on stderr so pipes stay clean. Set it once for the shell, and override per-call when you do want fresh output:
+
+```
+$ export LLM_REPLAY=1
+$ llm -s 'write a commit message' < diff.patch
+(replayed from 01k9m3a0xz… — saved 2,104 input, 412 output tokens)
+…
+
+$ llm --no-replay -s 'write a commit message' < diff.patch   # force fresh
+…
+```
+
+When the recorded answer is no longer the one you want — the underlying data changed but the prompt is the same — `llm replay clear` drops the index without touching response history, so the next call hits the model and re-indexes.
+
 ## Why "replay" and not "cache"
 
 The framing is deliberately borrowed from [VCR.py](https://vcrpy.readthedocs.io/). Under a *cache* framing, things like "`temperature > 0` returns identical bytes" and "URL attachments key by URL string, not fetched bytes" read as compromises. Under a *replay* framing they're the point — non-determinism is actively unwanted while you're debugging, and the system records what the caller put on the wire, not the current state of the world.
